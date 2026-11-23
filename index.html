@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guante</title>
+<style>
+body{font-family:sans-serif;margin:0;padding:16px;background:#111;color:#fff}
+h1{font-size:22px}
+textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px;border-radius:10px;border:0;height:120px}
+button{width:100%;font-size:22px;padding:16px;margin-top:12px;border:0;border-radius:12px;background:#2e7d32;color:#fff}
+p{color:#aaa;font-size:14px}
+</style>
+</head>
+<body>
+<h1>Guante traductor</h1>
+<textarea id="texto" placeholder="Escribí una frase"></textarea>
+<button id="decir">Decir</button>
+<p id="estado"></p>
+<script>
+const texto = document.getElementById("texto");
+const estado = document.getElementById("estado");
+document.getElementById("decir").onclick = function () {
+  if (!("speechSynthesis" in window)) {
+    estado.textContent = "Este navegador no tiene voz.";
+    return;
+  }
+  const frase = texto.value.trim();
+  if (frase === "") {
+    estado.textContent = "Escribí algo primero.";
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(frase);
+  u.lang = "es-AR";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+  estado.textContent = "Diciendo: " + frase;
+};
+</script>
+</body>
+</html>
