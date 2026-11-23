@@ -3,39 +3,208 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f172a">
 <title>Guante</title>
 <style>
-body{font-family:sans-serif;margin:0;padding:16px;background:#111;color:#fff}
-h1{font-size:22px}
-textarea{width:100%;box-sizing:border-box;font-size:20px;padding:12px;border-radius:10px;border:0;height:120px}
-button{width:100%;font-size:22px;padding:16px;margin-top:12px;border:0;border-radius:12px;background:#2e7d32;color:#fff}
-p{color:#aaa;font-size:14px}
+:root{--bg:#0f172a;--card:#1e293b;--ac:#22c55e;--tx:#f1f5f9;--mut:#94a3b8}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:480px;padding:16px 16px 90px;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+h1{font-size:24px;margin:4px 0 12px}
+h2{font-size:16px;margin:0 0 10px;color:var(--mut);font-weight:600}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:14px}
+button{border:0;border-radius:12px;font-size:17px;padding:14px;color:#fff;cursor:pointer;background:#334155}
+button:active{transform:scale(.97)}
+.grande{width:100%;background:var(--ac);font-size:20px;font-weight:bold}
+.rojo{background:#dc2626}
+.azul{background:#2563eb}
+.rejilla{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sec{display:none}.sec.on{display:block}
+#chat{min-height:160px;max-height:50vh;overflow:auto}
+.msg{padding:10px 12px;border-radius:14px;margin:8px 0;font-size:20px;max-width:90%}
+.msg small{display:block;font-size:12px;opacity:.7;margin-bottom:2px}
+.otro{background:#334155}
+.yo{background:#166534;margin-left:auto}
+#vivo{color:var(--mut);font-size:20px;min-height:26px;font-style:italic}
+#estado{color:var(--mut);font-size:14px;min-height:18px}
+.fila{display:flex;gap:8px;align-items:center;margin:8px 0}
+.fila span{flex:1;font-size:17px}
+.fila button{padding:8px 12px;font-size:15px}
+input[type=text]{width:100%;font-size:18px;padding:12px;border-radius:12px;border:0;background:#0f172a;color:#fff}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1e293b;border-top:1px solid #334155}
+nav button{flex:1;border-radius:0;background:none;color:var(--mut);font-size:14px;padding:12px 4px}
+nav button.on{color:var(--ac)}
 </style>
 </head>
 <body>
-<h1>Guante traductor</h1>
-<textarea id="texto" placeholder="Escrib� una frase"></textarea>
-<button id="decir">Decir</button>
-<p id="estado"></p>
+<h1>🧤 Guante traductor</h1>
+
+<section id="t-conv" class="sec on">
+  <div class="card">
+    <h2>Conversación</h2>
+    <div id="chat"></div>
+    <div id="vivo"></div>
+    <button class="grande" id="mic">🎤 Escuchar</button>
+    <p id="estado"></p>
+  </div>
+  <button id="limpiar" style="width:100%">Limpiar conversación</button>
+</section>
+
+<section id="t-guante" class="sec">
+  <div class="card">
+    <h2>Simulador del guante</h2>
+    <p style="color:var(--mut);font-size:14px;margin-top:0">Tocá un gesto como si lo hiciera el guante.</p>
+    <div class="rejilla" id="rejilla"></div>
+  </div>
+</section>
+
+<section id="t-dic" class="sec">
+  <div class="card">
+    <h2>Diccionario</h2>
+    <div id="lista"></div>
+  </div>
+  <div class="card">
+    <h2>Agregar frase</h2>
+    <input type="text" id="nueva" placeholder="Escribí una frase nueva">
+    <button class="grande" id="agregar" style="margin-top:10px">➕ Agregar</button>
+  </div>
+</section>
+
+<nav>
+  <button class="on" data-t="conv">💬<br>Conversación</button>
+  <button data-t="guante">🧤<br>Guante</button>
+  <button data-t="dic">📖<br>Diccionario</button>
+</nav>
+
 <script>
-const texto = document.getElementById("texto");
-const estado = document.getElementById("estado");
-document.getElementById("decir").onclick = function () {
-  if (!("speechSynthesis" in window)) {
-    estado.textContent = "Este navegador no tiene voz.";
-    return;
-  }
-  const frase = texto.value.trim();
-  if (frase === "") {
-    estado.textContent = "Escrib� algo primero.";
-    return;
-  }
+const $ = id => document.getElementById(id);
+const BASE = ["Hola","Gracias","Por favor","Sí","No","Necesito ayuda",
+  "Tengo hambre","Quiero agua","Quiero ir al baño","Más despacio","No entiendo","Chau"];
+
+function cargarDic(){
+  try{ const d = JSON.parse(localStorage.getItem("dic")); if (Array.isArray(d) && d.length) return d; }catch(e){}
+  return BASE.map((f, i) => ({c: i + 1, f: f}));
+}
+function guardarDic(){ try{ localStorage.setItem("dic", JSON.stringify(dic)); }catch(e){} }
+let dic = cargarDic();
+
+// ---------- pestañas ----------
+document.querySelectorAll("nav button").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll(".sec").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    $("t-" + b.dataset.t).classList.add("on");
+  };
+});
+
+// ---------- conversación ----------
+function agregarMsg(quien, texto){
+  const d = document.createElement("div");
+  d.className = "msg " + quien;
+  const s = document.createElement("small");
+  s.textContent = quien === "yo" ? "Yo (guante)" : "Otra persona";
+  const t = document.createElement("span");
+  t.textContent = texto;
+  d.appendChild(s); d.appendChild(t);
+  $("chat").appendChild(d);
+  $("chat").scrollTop = $("chat").scrollHeight;
+}
+$("limpiar").onclick = () => { $("chat").innerHTML = ""; $("vivo").textContent = ""; };
+
+// ---------- voz (solo para simular) ----------
+function decir(frase){
+  if (!("speechSynthesis" in window)) return;
   const u = new SpeechSynthesisUtterance(frase);
   u.lang = "es-AR";
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-  estado.textContent = "Diciendo: " + frase;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+// ---------- micrófono ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, escuchando = false;
+
+if (!SR){
+  $("estado").textContent = "Este navegador no puede transcribir. Usá Chrome en Android.";
+  $("mic").disabled = true;
+} else {
+  rec = new SR();
+  rec.lang = "es-AR";
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.onresult = e => {
+    let fin = "", prov = "";
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) fin += t; else prov += t;
+    }
+    $("vivo").textContent = prov;
+    if (fin.trim()) agregarMsg("otro", fin.trim());
+  };
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed"){
+      escuchando = false;
+      $("estado").textContent = "Falta el permiso del micrófono. Activalo en los ajustes del sitio.";
+      actualizarMic();
+    } else if (e.error !== "no-speech" && e.error !== "aborted"){
+      $("estado").textContent = "Error del micrófono: " + e.error;
+    }
+  };
+  rec.onend = () => {
+    $("vivo").textContent = "";
+    if (escuchando){ try{ rec.start(); }catch(e){} }
+  };
+}
+function actualizarMic(){
+  $("mic").textContent = escuchando ? "⏹ Dejar de escuchar" : "🎤 Escuchar";
+  $("mic").className = escuchando ? "grande rojo" : "grande";
+}
+$("mic").onclick = () => {
+  if (!rec) return;
+  if (escuchando){ escuchando = false; rec.stop(); $("estado").textContent = "Micrófono apagado."; }
+  else { escuchando = true; try{ rec.start(); }catch(e){} $("estado").textContent = "Escuchando..."; }
+  actualizarMic();
 };
+
+// ---------- guante simulado y diccionario ----------
+function render(){
+  $("rejilla").innerHTML = "";
+  dic.forEach(it => {
+    const b = document.createElement("button");
+    b.className = "azul";
+    b.textContent = it.f;
+    b.onclick = () => { agregarMsg("yo", it.f); decir(it.f); };
+    $("rejilla").appendChild(b);
+  });
+  $("lista").innerHTML = "";
+  dic.forEach(it => {
+    const fila = document.createElement("div");
+    fila.className = "fila";
+    const sp = document.createElement("span");
+    sp.textContent = "#" + it.c + "  " + it.f;
+    const bb = document.createElement("button");
+    bb.className = "rojo";
+    bb.textContent = "🗑";
+    bb.onclick = () => {
+      if (confirm("¿Borrar \"" + it.f + "\"?")){
+        dic = dic.filter(x => x.c !== it.c);
+        guardarDic(); render();
+      }
+    };
+    fila.appendChild(sp); fila.appendChild(bb);
+    $("lista").appendChild(fila);
+  });
+}
+$("agregar").onclick = () => {
+  const f = $("nueva").value.trim();
+  if (!f) return;
+  const sig = dic.reduce((m, x) => Math.max(m, x.c), 0) + 1;
+  dic.push({c: sig, f: f});
+  $("nueva").value = "";
+  guardarDic(); render();
+};
+
+render();
 </script>
 </body>
 </html>
